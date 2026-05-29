@@ -17,7 +17,7 @@ class Document(Base):
     file_path = Column(String)
     status = Column(String, default="uploaded")
     created_at = Column(DateTime, default=datetime.utcnow)
-    table_args = {"extend_existing": True}
+    # table_args = {"extend_existing": True}
 
 
 

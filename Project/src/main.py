@@ -2,12 +2,14 @@ import os
 import shutil
 from typing import List
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from . import models, schemas
+from . import models, schemas, services
 from .database import engine, get_db
 from .models import Document
+
+from .websocket_manager import manager
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -23,7 +25,11 @@ async def ping():
 #----upload document----
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)): #depends upon
+async def upload_pdf(
+    background_tasks: BackgroundTasks, #This is a special parameter that allows us to run tasks in the background without blocking the main thread. In this case, we will use it to trigger the document processing task after the file is uploaded.(always kept as the first parameter in the function definition)
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+    ): 
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are allowed.")
 
@@ -50,12 +56,28 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
     db.commit()
     db.refresh(new_doc)
 
-    return {
-        "id": new_doc.id,
-        "filename": new_doc.filename,
-        "status": new_doc.status,
-        "file_size": file_size,
-    }
+    #now we trigger the modular rag  service in background
+
+    background_tasks.add_task(services.process_document_task, new_doc.id, file.filename, db) #This line is adding the process_document_task function from the services module to the background tasks. It passes the document id, filename, and database session as arguments to the function. This allows the document processing to happen asynchronously in the background while the API can immediately return a response to the client.
+    return new_doc
+
+
+
+#----websocket endpoint for notifications----
+
+
+@app.websocket("/ws/notifications")
+async def websocket_endpoint(websocket: WebSocket): 
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text() 
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+
+
+
 
 
 

@@ -16,19 +16,23 @@ def generate_answer(
 ) -> str:
 
     prompt = f"""
-You are a document QA assistant.
+        You are a RAG-based document assistant.
 
-Rules:
-1. Answer ONLY using the provided context.
-2. If the answer is not present, say so.
-3. Do not invent facts.
+        You MUST follow these rules:
 
-Question:
-{question}
+        1. Answer ONLY from the provided context.
+        2. Do NOT invent information.
+        3. If the answer is not found in the context, say:
+        "The provided document does not contain enough information to answer this question."
+        4. Keep answers concise and factual.
+        5. Use bullet points when appropriate.
 
-Context:
-{context}
-"""
+        QUESTION:
+        {question}
+
+        CONTEXT:
+        {context}
+    """
 
     response = model.generate_content(prompt)
 

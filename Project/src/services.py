@@ -1,6 +1,8 @@
 import asyncio
 import os
 from typing import Any
+
+from matplotlib.style import context
 from .config import EMBEDDING_MODEL
 
 from sqlalchemy.orm import Session
@@ -10,6 +12,9 @@ from .database import sessionLocal
 from .milvus_store import milvus_store
 from .websocket_manager import manager
 from sentence_transformers import SentenceTransformer
+
+from .llm_service import generate_answer
+
 
 EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
     EMBEDDING_MODEL
@@ -140,7 +145,12 @@ async def answer_question(question: str, document_id: int | None = None, top_k: 
     context_lines = [
         f"[Source {idx + 1}] {hit['content']}" for idx, hit in enumerate(hits)
     ]
-    answer = "\n\n".join(context_lines)
+    context = "\n\n".join(context_lines)
+
+    answer = generate_answer(
+        question=question,
+        context=context,
+    )
 
     return {
         "answer": answer,

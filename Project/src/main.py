@@ -24,12 +24,12 @@ async def ping():
 
 #----upload document----
 
-@app.post("/upload")
+@app.post("/upload", response_model=schemas.DocumentResponse)
 async def upload_pdf(
     background_tasks: BackgroundTasks, #This is a special parameter that allows us to run tasks in the background without blocking the main thread. In this case, we will use it to trigger the document processing task after the file is uploaded.(always kept as the first parameter in the function definition)
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
-    ): 
+    ):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are allowed.")
 
@@ -56,9 +56,8 @@ async def upload_pdf(
     db.commit()
     db.refresh(new_doc)
 
-    #now we trigger the modular rag  service in background
-
-    background_tasks.add_task(services.process_document_task, new_doc.id, file.filename, db) #This line is adding the process_document_task function from the services module to the background tasks. It passes the document id, filename, and database session as arguments to the function. This allows the document processing to happen asynchronously in the background while the API can immediately return a response to the client.
+    # Trigger ingestion in background; task creates its own DB session.
+    background_tasks.add_task(services.process_document_task, new_doc.id, file.filename)
     return new_doc
 
 
@@ -67,7 +66,7 @@ async def upload_pdf(
 
 
 @app.websocket("/ws/notifications")
-async def websocket_endpoint(websocket: WebSocket): 
+async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
@@ -96,3 +95,59 @@ async def get_documents(db: Session = Depends(get_db)):
         }
         for doc in docs
     ]
+
+
+@app.get("/documents/{document_id}", response_model=schemas.DocumentResponse)
+async def get_document(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "status": doc.status,
+        "file_size": doc.file_size if doc.file_size is not None else (os.path.getsize(doc.file_path) if doc.file_path and os.path.exists(doc.file_path) else 0),
+    }
+
+
+@app.patch("/documents/{document_id}", response_model=schemas.DocumentResponse)
+async def update_document_status(document_id: int, payload: schemas.DocumentStatusUpdate, db: Session = Depends(get_db)):
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc.status = payload.status
+    db.commit()
+    db.refresh(doc)
+
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "status": doc.status,
+        "file_size": doc.file_size if doc.file_size is not None else (os.path.getsize(doc.file_path) if doc.file_path and os.path.exists(doc.file_path) else 0),
+    }
+
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    services.delete_document_assets(document_id=doc.id, file_path=doc.file_path)
+    db.delete(doc)
+    db.commit()
+    return {"message": "Document deleted", "id": document_id}
+
+
+@app.post("/chat", response_model=schemas.ChatResponse)
+async def chat(payload: schemas.ChatRequest):
+    try:
+        return await services.answer_question(
+            question=payload.question,
+            document_id=payload.document_id,
+            top_k=payload.top_k,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Chat service unavailable: {str(exc)}") from exc

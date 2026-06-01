@@ -33,4 +33,26 @@ class DocumentResponse(BaseModel): #This is the response model for the document 
     #    model_config = ConfigDict(include={"name", "age"}) # This will include only the name and age fields when serializing the model.
     #user = User(name="Alice", age=30, email="alice@example.com") # This will include only the name and age fields when serializing the model.
 
+
+class DocumentStatusUpdate(BaseModel):
+    status: str
+
+
+class ChatRequest(BaseModel):
+    question: str
+    document_id: int | None = None
+    top_k: int = 5
+
+
+class ChatCitation(BaseModel):
+    document_id: int
+    chunk_index: int
+    score: float
+    content_preview: str
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    citations: list[ChatCitation]
+
     

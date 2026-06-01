@@ -1,11 +1,20 @@
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+import os
 
+print("DATABASE_URL =", os.getenv("DATABASE_URL"))
+print("MILVUS_LITE_DB =", os.getenv("MILVUS_LITE_DB"))
+print("MILVUS_COLLECTION =", os.getenv("MILVUS_COLLECTION"))
+print("EMBEDDING_MODEL =", os.getenv("EMBEDDING_MODEL"))
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set. Add it to your .env file.")
 

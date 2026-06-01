@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-multipart
+websockets
+pypdf
+sentence-transformers
+pymilvus
+torch
+transformers

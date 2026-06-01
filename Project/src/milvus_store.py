@@ -2,9 +2,15 @@ import os
 import time
 from typing import Any
 
+from .config import (
+    MILVUS_COLLECTION,
+    EMBEDDING_DIM,
+    MILVUS_LITE_DB,
+)
+
 from pymilvus import MilvusClient
 
-lite_db_path = os.getenv("MILVUS_LITE_DB", "milvus_demo.db")
+lite_db_path = MILVUS_LITE_DB
 
 print("MILVUS FILE =", os.path.abspath(lite_db_path))
 
@@ -12,8 +18,8 @@ class MilvusStore:
     """Small Milvus wrapper to keep vector DB operations isolated."""
 
     def __init__(self) -> None:
-        self.collection_name = os.getenv("MILVUS_COLLECTION", "document_chunks")
-        self.dim = int(os.getenv("EMBEDDING_DIM", "384"))
+        self.collection_name = MILVUS_COLLECTION
+        self.dim = EMBEDDING_DIM
         self._client: MilvusClient | None = None
 
     def _get_client(self) -> MilvusClient:
@@ -26,7 +32,7 @@ class MilvusStore:
             self._client = MilvusClient(uri=uri, token=token)
             return self._client
 
-        lite_db_path = os.getenv("MILVUS_LITE_DB", "milvus_demo.db")
+        lite_db_path = MILVUS_LITE_DB
         self._client = MilvusClient(lite_db_path)
         return self._client
 

@@ -1,6 +1,7 @@
 import asyncio
 import os
 from typing import Any
+from .config import EMBEDDING_MODEL
 
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,11 @@ from . import models
 from .database import sessionLocal
 from .milvus_store import milvus_store
 from .websocket_manager import manager
+from sentence_transformers import SentenceTransformer
+
+EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
+    EMBEDDING_MODEL
+)
 
 
 def _extract_text_from_pdf(file_path: str) -> str:
@@ -17,7 +23,7 @@ def _extract_text_from_pdf(file_path: str) -> str:
     pages = [page.extract_text() or "" for page in reader.pages]
     return "\n".join(pages).strip()
 
-
+#currently the chunking is not optimised as it just strip on the basis of character count, we can further improve it by using a more intelligent approach that takes into account sentence boundaries, semantic coherence, or even using a sliding window technique to create overlapping chunks.
 def _chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> list[str]:
     if not text:
         return []
@@ -37,11 +43,11 @@ def _chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> list[st
 
 
 def _embed_texts(texts: list[str]) -> list[list[float]]:
-    from sentence_transformers import SentenceTransformer
+    vectors = EMBEDDING_MODEL_INSTANCE.encode(
+        texts,
+        normalize_embeddings=True
+    )
 
-    model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    model = SentenceTransformer(model_name)
-    vectors = model.encode(texts, normalize_embeddings=True)
     return [vector.tolist() for vector in vectors]
 
 

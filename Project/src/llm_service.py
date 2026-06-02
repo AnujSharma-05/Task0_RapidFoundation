@@ -1,3 +1,5 @@
+import asyncio
+
 import google.generativeai as genai
 from src.config import GEMINI_API_KEY
 
@@ -10,7 +12,7 @@ model = genai.GenerativeModel(
 )
 
 
-def generate_answer(
+async def generate_answer(
     question: str,
     context: str,
 ) -> str:
@@ -34,6 +36,6 @@ def generate_answer(
         {context}
     """
 
-    response = model.generate_content(prompt)
+    response = await model.generate_content(prompt)
 
     return response.text

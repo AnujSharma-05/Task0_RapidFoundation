@@ -129,11 +129,6 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         db.close()
 
 
-
-
-
-
-
 async def answer_question(question: str, document_id: int | None = None, top_k: int = 5) -> dict[str, Any]:
     """Retrieve relevant chunks from Milvus and build a grounded response payload."""
     query_vector = _embed_query(question)
@@ -174,7 +169,7 @@ async def answer_question(question: str, document_id: int | None = None, top_k: 
     ]
     context = "\n\n".join(context_lines)
 
-    answer = generate_answer(
+    answer = await generate_answer(
         question=question,
         context=context,
     )
@@ -185,13 +180,13 @@ async def answer_question(question: str, document_id: int | None = None, top_k: 
     }
 
 
-def delete_document_assets(document_id: int, file_path: str | None) -> None:
+async def delete_document_assets(document_id: int, file_path: str | None) -> None:
     """Delete physical file + Milvus vectors for a document."""
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
-    milvus_store.delete_document_chunks(document_id)
+    await milvus_store.delete_document_chunks(document_id)
 
-def reset_system() -> None:
+async def reset_system() -> None:
 
     uploads_dir = "uploads"
 

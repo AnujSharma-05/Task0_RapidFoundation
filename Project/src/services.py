@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 from matplotlib.style import context
+from networkx import hits
 from .config import EMBEDDING_MODEL
 
 from sqlalchemy.orm import Session
@@ -14,6 +15,12 @@ from .websocket_manager import manager
 from sentence_transformers import SentenceTransformer
 
 from .llm_service import generate_answer
+from .config import (
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+)
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
@@ -29,22 +36,23 @@ def _extract_text_from_pdf(file_path: str) -> str:
     return "\n".join(pages).strip()
 
 #currently the chunking is not optimised as it just strip on the basis of character count, we can further improve it by using a more intelligent approach that takes into account sentence boundaries, semantic coherence, or even using a sliding window technique to create overlapping chunks.
-def _chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> list[str]:
-    if not text:
-        return []
+def _chunk_text(
+    text: str,
+) -> list[str]:
 
-    chunks: list[str] = []
-    start = 0
-    text_len = len(text)
-    while start < text_len:
-        end = min(start + chunk_size, text_len)
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        if end == text_len:
-            break
-        start = max(0, end - overlap)
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        separators=[
+            "\n\n",
+            "\n",
+            ". ",
+            " ",
+            "",
+        ],
+    )
+
+    return splitter.split_text(text)
 
 
 def _embed_texts(texts: list[str]) -> list[list[float]]:
@@ -121,10 +129,29 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         db.close()
 
 
+
+
+
+
+
 async def answer_question(question: str, document_id: int | None = None, top_k: int = 5) -> dict[str, Any]:
     """Retrieve relevant chunks from Milvus and build a grounded response payload."""
     query_vector = _embed_query(question)
     hits = milvus_store.search(query_embedding=query_vector, top_k=max(1, min(top_k, 10)), document_id=document_id)
+
+    print("\n========== RETRIEVED CHUNKS ==========")
+
+    for idx, hit in enumerate(hits):
+        print(
+            f"\nChunk {idx+1}"
+        )
+        print(
+            hit["content"][:300]
+        )
+
+    print(
+        "\n====================================="
+    )
 
     if not hits:
         return {
@@ -163,3 +190,20 @@ def delete_document_assets(document_id: int, file_path: str | None) -> None:
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
     milvus_store.delete_document_chunks(document_id)
+
+def reset_system() -> None:
+
+    uploads_dir = "uploads"
+
+    if os.path.exists(uploads_dir):
+        for file_name in os.listdir(uploads_dir):
+
+            file_path = os.path.join(
+                uploads_dir,
+                file_name,
+            )
+
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
+    milvus_store.delete_all_chunks()

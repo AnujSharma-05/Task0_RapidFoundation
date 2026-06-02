@@ -96,5 +96,20 @@ class MilvusStore:
         client = self._get_client()
         client.delete(collection_name=self.collection_name, filter=f"document_id == {document_id}")
 
+    def delete_all_chunks(self) -> None:
+        client = self._get_client()
+
+        if client.has_collection(
+            collection_name=self.collection_name
+        ):
+            client.drop_collection(
+                collection_name=self.collection_name
+            )
+
+        client.create_collection(
+            collection_name=self.collection_name,
+            dimension=self.dim,
+        )
+
 
 milvus_store = MilvusStore()

@@ -151,3 +151,35 @@ async def chat(payload: schemas.ChatRequest):
         )
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Chat service unavailable: {str(exc)}") from exc
+
+
+@app.delete("/documents")
+async def delete_all_documents(
+    db: Session = Depends(get_db)
+):
+
+    document_count = db.query(
+        models.Document
+    ).count()
+
+    chunk_count = db.query(
+        models.DocumentChunk
+    ).count()
+
+    services.reset_system()
+
+    db.query(
+        models.DocumentChunk
+    ).delete()
+
+    db.query(
+        models.Document
+    ).delete()
+
+    db.commit()
+
+    return {
+        "message": "System reset successful",
+        "documents_deleted": document_count,
+        "chunks_deleted": chunk_count,
+    }

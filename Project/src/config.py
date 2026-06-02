@@ -32,3 +32,18 @@ EMBEDDING_DIM = int(
 GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
+
+
+CHUNK_SIZE = int(
+    os.getenv(
+        "CHUNK_SIZE",
+        "800"
+    )
+)
+
+CHUNK_OVERLAP = int(
+    os.getenv(
+        "CHUNK_OVERLAP",
+        "120"
+    )
+)

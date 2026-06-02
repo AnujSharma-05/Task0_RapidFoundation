@@ -19,6 +19,7 @@ from .config import (
     CHUNK_SIZE,
     CHUNK_OVERLAP,
 )
+from sqlalchemy import text
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -184,21 +185,42 @@ async def delete_document_assets(document_id: int, file_path: str | None) -> Non
     """Delete physical file + Milvus vectors for a document."""
     if file_path and os.path.exists(file_path):
         os.remove(file_path)
-    await milvus_store.delete_document_chunks(document_id)
+    milvus_store.delete_document_chunks(document_id)
 
 async def reset_system() -> None:
 
-    uploads_dir = "uploads"
+    db: Session = sessionLocal()
 
-    if os.path.exists(uploads_dir):
-        for file_name in os.listdir(uploads_dir):
+    try:
 
-            file_path = os.path.join(
-                uploads_dir,
-                file_name,
+        uploads_dir = "uploads"
+
+        if os.path.exists(uploads_dir):
+            for file_name in os.listdir(uploads_dir):
+
+                file_path = os.path.join(
+                    uploads_dir,
+                    file_name,
+                )
+
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+
+        milvus_store.delete_all_chunks()
+
+        db.execute(
+            text(
+                "TRUNCATE TABLE document_chunks RESTART IDENTITY CASCADE"
             )
+        )
 
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+        db.execute(
+            text(
+                "TRUNCATE TABLE documents RESTART IDENTITY CASCADE"
+            )
+        )
 
-    milvus_store.delete_all_chunks()
+        db.commit()
+
+    finally:
+        db.close()

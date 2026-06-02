@@ -36,6 +36,9 @@ async def generate_answer(
         {context}
     """
 
-    response = await model.generate_content(prompt)
+    response = await asyncio.to_thread(
+        model.generate_content,
+        prompt,
+    )
 
     return response.text

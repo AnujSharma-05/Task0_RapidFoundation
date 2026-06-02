@@ -4,13 +4,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+MILVUS_URI = os.getenv(
+    "MILVUS_URI"
+)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-MILVUS_LITE_DB = os.getenv(
-    "MILVUS_LITE_DB",
-    "milvus_demo.db"
-)
 
 MILVUS_COLLECTION = os.getenv(
     "MILVUS_COLLECTION",

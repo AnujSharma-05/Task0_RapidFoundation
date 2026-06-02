@@ -18,8 +18,8 @@ app = FastAPI()
 
 @app.get("/ping")
 async def ping():
-    return {"status": "alive", "message": "pong"}
-
+    print("PING HIT")
+    return {"status": "alive"}
 
 
 #----upload document----
@@ -135,7 +135,7 @@ async def delete_document(document_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    services.delete_document_assets(document_id=doc.id, file_path=doc.file_path)
+    await services.delete_document_assets(document_id=doc.id, file_path=doc.file_path)
     db.delete(doc)
     db.commit()
     return {"message": "Document deleted", "id": document_id}
@@ -166,7 +166,7 @@ async def delete_all_documents(
         models.DocumentChunk
     ).count()
 
-    services.reset_system()
+    await services.reset_system()
 
     db.query(
         models.DocumentChunk

@@ -5,14 +5,12 @@ from typing import Any
 from .config import (
     MILVUS_COLLECTION,
     EMBEDDING_DIM,
-    MILVUS_LITE_DB,
+    MILVUS_URI,
 )
 
 from pymilvus import MilvusClient
 
-lite_db_path = MILVUS_LITE_DB
-
-print("MILVUS FILE =", os.path.abspath(lite_db_path))
+print("milvus_store import started")
 
 class MilvusStore:
     """Small Milvus wrapper to keep vector DB operations isolated."""
@@ -23,17 +21,28 @@ class MilvusStore:
         self._client: MilvusClient | None = None
 
     def _get_client(self) -> MilvusClient:
+
         if self._client is not None:
             return self._client
 
         uri = os.getenv("MILVUS_URI")
-        if uri:
-            token = os.getenv("MILVUS_TOKEN")
-            self._client = MilvusClient(uri=uri, token=token)
-            return self._client
 
-        lite_db_path = MILVUS_LITE_DB
-        self._client = MilvusClient(lite_db_path)
+        if not uri:
+            raise RuntimeError(
+                "MILVUS_URI is not configured"
+            )
+
+        print(
+            f"CONNECTED TO MILVUS SERVER: {uri}"
+        )
+
+        token = os.getenv("MILVUS_TOKEN")
+
+        self._client = MilvusClient(
+            uri=uri,
+            token=token,
+        )
+
         return self._client
 
     def ensure_collection(self) -> None:
@@ -111,5 +120,8 @@ class MilvusStore:
             dimension=self.dim,
         )
 
+print("creating milvus_store singleton")
 
 milvus_store = MilvusStore()
+
+print("milvus_store singleton created")

@@ -68,7 +68,11 @@ class MilvusStore:
             }
             for idx in range(len(chunks))
         ]
+        print(
+                f"INSERTING {len(chunks)} CHUNKS"
+            )
         result = client.insert(collection_name=self.collection_name, data=data)
+        print(result)
         return [int(i) for i in result.get("ids", [])]
 
     def search(self, query_embedding: list[float], top_k: int = 5, document_id: int | None = None) -> list[dict[str, Any]]:
@@ -105,20 +109,49 @@ class MilvusStore:
         client = self._get_client()
         client.delete(collection_name=self.collection_name, filter=f"document_id == {document_id}")
 
+    # def delete_all_chunks(self) -> None:
+    #     client = self._get_client()
+
+    #     if client.has_collection(
+    #         collection_name=self.collection_name
+    #     ):
+    #         client.drop_collection(
+    #             collection_name=self.collection_name
+    #         )
+
+    #     client.create_collection(
+    #         collection_name=self.collection_name,
+    #         dimension=self.dim,
+    #     )
+
     def delete_all_chunks(self) -> None:
+
+        print("MILVUS A")
+
         client = self._get_client()
+
+        print("MILVUS B")
 
         if client.has_collection(
             collection_name=self.collection_name
         ):
+
+            print("MILVUS C")
+
             client.drop_collection(
                 collection_name=self.collection_name
             )
+
+            print("MILVUS D")
+
+        print("MILVUS E")
 
         client.create_collection(
             collection_name=self.collection_name,
             dimension=self.dim,
         )
+
+        print("MILVUS F")
 
 print("creating milvus_store singleton")
 

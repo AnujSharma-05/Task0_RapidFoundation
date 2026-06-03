@@ -1,7 +1,6 @@
 import asyncio
 import os
 from typing import Any
-
 from matplotlib.style import context
 from networkx import hits
 from .config import EMBEDDING_MODEL
@@ -11,7 +10,7 @@ from sqlalchemy.orm import Session
 from . import models
 from .database import sessionLocal
 from .milvus_store import milvus_store
-from .websocket_manager import manager
+# from .websocket_manager import manager
 from sentence_transformers import SentenceTransformer
 
 from .llm_service import generate_answer
@@ -22,6 +21,7 @@ from .config import (
 from sqlalchemy import text
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
 
 
 EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
@@ -30,7 +30,6 @@ EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
 
 
 def _extract_text_from_pdf(file_path: str) -> str:
-    from pypdf import PdfReader
 
     reader = PdfReader(file_path)
     pages = [page.extract_text() or "" for page in reader.pages]
@@ -73,11 +72,11 @@ async def process_document_task(doc_id: int, filename: str) -> None:
     """Background ingestion pipeline for uploaded PDFs."""
     db: Session = sessionLocal()
     try:
-        await manager.broadcast(f"{filename}: Text extraction started...")
+        # await manager.broadcast(f"{filename}: Text extraction started...")
 
         doc = db.query(models.Document).filter(models.Document.id == doc_id).first()
         if not doc:
-            await manager.broadcast(f"{filename}: Document not found in DB.")
+            # await manager.broadcast(f"{filename}: Document not found in DB.")
             return
 
         doc.status = "processing"
@@ -87,17 +86,17 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         if not text:
             doc.status = "failed"
             db.commit()
-            await manager.broadcast(f"{filename}: No extractable text found.")
+            # await manager.broadcast(f"{filename}: No extractable text found.")
             return
 
         chunks = _chunk_text(text)
         if not chunks:
             doc.status = "failed"
             db.commit()
-            await manager.broadcast(f"{filename}: Chunking produced no content.")
+            # await manager.broadcast(f"{filename}: Chunking produced no content.")
             return
 
-        await manager.broadcast(f"{filename}: Generating embeddings...")
+        # await manager.broadcast(f"{filename}: Generating embeddings...")
         embeddings = _embed_texts(chunks)
 
         milvus_ids = milvus_store.upsert_chunks(document_id=doc_id, chunks=chunks, embeddings=embeddings)
@@ -117,7 +116,10 @@ async def process_document_task(doc_id: int, filename: str) -> None:
 
         doc.status = "ready"
         db.commit()
-        await manager.broadcast(f"{filename}: Ready for chat.")
+        # await manager.broadcast(f"{filename}: Ready for chat.")
+        print(
+            f"DOCUMENT {doc_id} FINISHED"
+        )   
 
     except Exception as exc:  # pragma: no cover - safety path for async task
         db.rollback()
@@ -125,7 +127,7 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         if doc:
             doc.status = "failed"
             db.commit()
-        await manager.broadcast(f"Error processing {filename}: {str(exc)}")
+        # await manager.broadcast(f"Error processing {filename}: {str(exc)}")
     finally:
         db.close()
 
@@ -189,15 +191,18 @@ async def delete_document_assets(document_id: int, file_path: str | None) -> Non
 
 async def reset_system() -> None:
 
+    print("RESET STARTED")
+
     db: Session = sessionLocal()
 
     try:
+
+        print("STEP 1")
 
         uploads_dir = "uploads"
 
         if os.path.exists(uploads_dir):
             for file_name in os.listdir(uploads_dir):
-
                 file_path = os.path.join(
                     uploads_dir,
                     file_name,
@@ -206,21 +211,37 @@ async def reset_system() -> None:
                 if os.path.isfile(file_path):
                     os.remove(file_path)
 
+        print("STEP 2")
+
         milvus_store.delete_all_chunks()
+        print("BEFORE TRUNCATE")
 
         db.execute(
             text(
-                "TRUNCATE TABLE document_chunks RESTART IDENTITY CASCADE"
+                """
+                TRUNCATE TABLE
+                    document_chunks,
+                    documents
+                RESTART IDENTITY
+                CASCADE
+                """
             )
         )
 
-        db.execute(
-            text(
-                "TRUNCATE TABLE documents RESTART IDENTITY CASCADE"
-            )
-        )
-
+        print("AFTER TRUNCATE")
         db.commit()
+        result = db.execute(
+            text(
+                "SELECT nextval('documents_id_seq')"
+            )
+        )
 
+        print(
+            "NEXTVAL AFTER RESET =",
+            result.scalar()
+        )
     finally:
+
+        print("STEP 7")
+
         db.close()

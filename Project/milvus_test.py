@@ -1,15 +1,16 @@
-from src.milvus_store import milvus_store
+from pymilvus import MilvusClient
 
-client = milvus_store._get_client()
-
-client.load_collection(
-    collection_name="document_chunks"
+client = MilvusClient(
+    uri="http://localhost:19530"
 )
 
-results = client.search(
+rows = client.query(
     collection_name="document_chunks",
-    data=[[0.0] * 384],
-    limit=3
+    filter="id > 0",
+    output_fields=["document_id", "chunk_index", "content"],
+    limit=5
 )
 
-print(results)
+for row in rows:
+    print(row)
+    

@@ -2,18 +2,19 @@ import os
 import shutil
 from typing import List
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from . import models, schemas, services
 from .database import engine, get_db
 from .models import Document
 
-from .websocket_manager import manager
+# from .websocket_manager import manager
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+#the server startup command is: uvicorn src.main:app --reload
 
 
 @app.get("/ping")
@@ -62,17 +63,17 @@ async def upload_pdf(
 
 
 
-#----websocket endpoint for notifications----
+# #----websocket endpoint for notifications----
 
 
-@app.websocket("/ws/notifications")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            await websocket.receive_text() 
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+# @app.websocket("/ws/notifications")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await manager.connect(websocket)
+#     try:
+#         while True:
+#             await websocket.receive_text() 
+#     except WebSocketDisconnect:
+#         manager.disconnect(websocket)
 
 
 
@@ -155,6 +156,9 @@ async def chat(payload: schemas.ChatRequest):
 
 @app.delete("/documents")
 async def delete_all_documents(
+
+
+
     db: Session = Depends(get_db)
 ):
 
@@ -168,18 +172,25 @@ async def delete_all_documents(
 
     await services.reset_system()
 
-    db.query(
-        models.DocumentChunk
-    ).delete()
-
-    db.query(
-        models.Document
-    ).delete()
-
-    db.commit()
-
     return {
         "message": "System reset successful",
         "documents_deleted": document_count,
         "chunks_deleted": chunk_count,
+    }
+
+
+
+    db: Session = Depends(get_db)
+
+
+@app.get("/debug/db")
+async def debug_db(
+    db: Session = Depends(get_db)
+):
+    return {
+        "documents":
+            db.query(models.Document).count(),
+
+        "chunks":
+            db.query(models.DocumentChunk).count()
     }

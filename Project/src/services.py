@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from . import models
 from .database import sessionLocal
 from .milvus_store import milvus_store
-# from .websocket_manager import manager
+
 from sentence_transformers import SentenceTransformer
 
 from .llm_service import generate_answer
@@ -72,11 +72,8 @@ async def process_document_task(doc_id: int, filename: str) -> None:
     """Background ingestion pipeline for uploaded PDFs."""
     db: Session = sessionLocal()
     try:
-        # await manager.broadcast(f"{filename}: Text extraction started...")
-
         doc = db.query(models.Document).filter(models.Document.id == doc_id).first()
         if not doc:
-            # await manager.broadcast(f"{filename}: Document not found in DB.")
             return
 
         doc.status = "processing"
@@ -86,17 +83,14 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         if not text:
             doc.status = "failed"
             db.commit()
-            # await manager.broadcast(f"{filename}: No extractable text found.")
             return
 
         chunks = _chunk_text(text)
         if not chunks:
             doc.status = "failed"
             db.commit()
-            # await manager.broadcast(f"{filename}: Chunking produced no content.")
             return
 
-        # await manager.broadcast(f"{filename}: Generating embeddings...")
         embeddings = _embed_texts(chunks)
 
         milvus_ids = milvus_store.upsert_chunks(document_id=doc_id, chunks=chunks, embeddings=embeddings)
@@ -116,7 +110,6 @@ async def process_document_task(doc_id: int, filename: str) -> None:
 
         doc.status = "ready"
         db.commit()
-        # await manager.broadcast(f"{filename}: Ready for chat.")
         print(
             f"DOCUMENT {doc_id} FINISHED"
         )   
@@ -127,7 +120,6 @@ async def process_document_task(doc_id: int, filename: str) -> None:
         if doc:
             doc.status = "failed"
             db.commit()
-        # await manager.broadcast(f"Error processing {filename}: {str(exc)}")
     finally:
         db.close()
 

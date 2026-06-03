@@ -9,8 +9,6 @@ from . import models, schemas, services
 from .database import engine, get_db
 from .models import Document
 
-# from .websocket_manager import manager
-
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -60,26 +58,6 @@ async def upload_pdf(
     # Trigger ingestion in background; task creates its own DB session.
     background_tasks.add_task(services.process_document_task, new_doc.id, file.filename)
     return new_doc
-
-
-
-# #----websocket endpoint for notifications----
-
-
-# @app.websocket("/ws/notifications")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await manager.connect(websocket)
-#     try:
-#         while True:
-#             await websocket.receive_text() 
-#     except WebSocketDisconnect:
-#         manager.disconnect(websocket)
-
-
-
-
-
-
 
 #----get all documents----
 

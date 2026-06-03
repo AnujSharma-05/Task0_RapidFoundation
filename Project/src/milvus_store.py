@@ -8,7 +8,7 @@ from .config import (
     MILVUS_URI,
 )
 
-from pymilvus import MilvusClient
+from pymilvus import MilvusClient, DataType
 
 print("milvus_store import started")
 
@@ -45,13 +45,51 @@ class MilvusStore:
 
         return self._client
 
-    def ensure_collection(self) -> None:
+    def _create_collection(self, client: MilvusClient) -> None:
+        schema = client.create_schema(
+            auto_id=False,
+            enable_dynamic_field=True
+        )
+        
+        # Primary Key
+        schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
+        # Vector Field
+        schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=self.dim)
+        # Custom Scalar Fields
+        schema.add_field(field_name="document_id", datatype=DataType.INT64)
+        schema.add_field(field_name="chunk_index", datatype=DataType.INT64)
+        schema.add_field(field_name="content", datatype=DataType.VARCHAR, max_length=65535)
+        
+        client.create_collection(
+            collection_name=self.collection_name,
+            schema=schema
+        )
+        
+        # Prepare vector index
+        index_params = client.prepare_index_params()
+        index_params.add_index(
+            field_name="vector",
+            index_type="AUTOINDEX",
+            metric_type="COSINE"
+        )
+        client.create_index(
+            collection_name=self.collection_name,
+            index_params=index_params
+        )
+        print(f"CREATED COLLECTION & INDEX: {self.collection_name}")
+
+    def ensure_collection(self) -> None: 
         client = self._get_client()
 
-        if client.has_collection(collection_name=self.collection_name):
-            return
+        if not client.has_collection(collection_name=self.collection_name):
+            self._create_collection(client)
 
-        client.create_collection(collection_name=self.collection_name, dimension=self.dim)
+        # Always ensure the collection is loaded into memory.
+        # Attu's Data Explorer and any query() call requires the collection
+        # to be in a Loaded state. Without this, Attu shows 'No data found'
+        # even when data physically exists in the growing segment.
+        client.load_collection(collection_name=self.collection_name)
+        print(f"COLLECTION LOADED: {self.collection_name}")
 
     def upsert_chunks(self, document_id: int, chunks: list[str], embeddings: list[list[float]]) -> list[int]:
         self.ensure_collection()
@@ -73,12 +111,20 @@ class MilvusStore:
             )
         result = client.insert(collection_name=self.collection_name, data=data)
         print(result)
+
+        # Flush pushes the in-memory growing segment to sealed segments.
+        # Without this, Attu's Data Explorer shows 'No data found' because
+        # it only reads sealed (persisted) segments, not the write buffer.
+        # Python client.query() reads both, which is why queries worked but
+        # Attu showed nothing.
+        client.flush(collection_name=self.collection_name)
+        print(f"FLUSHED {len(chunks)} CHUNKS TO MILVUS")
+
         return [int(i) for i in result.get("ids", [])]
 
     def search(self, query_embedding: list[float], top_k: int = 5, document_id: int | None = None) -> list[dict[str, Any]]:
-        self.ensure_collection()
+        self.ensure_collection()  # also loads the collection
         client = self._get_client()
-        client.load_collection(collection_name=self.collection_name)
         search_kwargs: dict[str, Any] = {
             "collection_name": self.collection_name,
             "data": [query_embedding],
@@ -146,10 +192,7 @@ class MilvusStore:
 
         print("MILVUS E")
 
-        client.create_collection(
-            collection_name=self.collection_name,
-            dimension=self.dim,
-        )
+        self._create_collection(client)
 
         print("MILVUS F")
 

@@ -1,0 +1,62 @@
+# ==========================================
+# 1. Base Image selection
+# ==========================================
+FROM python:3.10-slim 
+
+
+# ==========================================
+# 2. Environment Variables
+# ==========================================
+# Set only runtime flags in the Dockerfile
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+
+# ==========================================
+# 3. Work Directory Setup
+# ==========================================
+WORKDIR /app
+
+
+
+# ==========================================
+# 4. System Dependencies Installation
+# ==========================================
+# Installs compiler tools needed for some python wheels, then cleans up cache
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# ==========================================
+# 5. Dependency Layer Caching (The "Pip Install" Step)
+# ==========================================
+# Copy only the requirements first
+COPY requirements.txt .
+
+# 1. Install CPU-only version of PyTorch first to prevent downloading massive 2GB+ CUDA wheels
+RUN pip install --no-cache-dir torch==2.12.0 --extra-index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install the rest of the requirements (will skip downloading GPU PyTorch since CPU torch is already installed)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Prefetch the Sentence Transformers embedding model weights during build.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+# ==========================================
+# 6. Copying Application Code
+# ==========================================
+# Create a folder for local file uploads
+RUN mkdir -p uploads
+
+# Copy the source code into the container
+COPY src/ ./src/
+
+# ==========================================
+# 7. Execution Configuration
+# ==========================================
+# Document that the container listens on port 8000
+EXPOSE 8000
+
+# Start the application
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -14,7 +14,7 @@ MILVUS_COLLECTION = os.getenv(
     "MILVUS_COLLECTION",
     "document_chunks"
 )
-
+    
 EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL",
     "sentence-transformers/all-MiniLM-L6-v2"

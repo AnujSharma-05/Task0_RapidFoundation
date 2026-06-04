@@ -110,6 +110,9 @@ class MilvusStore:
                 f"INSERTING {len(chunks)} CHUNKS"
             )
         result = client.insert(collection_name=self.collection_name, data=data)
+        client.load_collection(
+            collection_name=self.collection_name
+        )
         print(result)
 
         # Flush pushes the in-memory growing segment to sealed segments.

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: jpl-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: task0_user
+      POSTGRES_PASSWORD: task0_password
+      POSTGRES_DB: JPL_task0_RapidFoundation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. FastAPI Application Service
+  web:
+    build: .
+    container_name: jpl-rag-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://task0_user:task0_password@db:5432/JPL_task0_RapidFoundation
+      - MILVUS_URI=http://host.docker.internal:19530
+      - GEMINI_API_KEY=your_gemini_api_key_here
+      - MILVUS_COLLECTION=document_chunks
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - EMBEDDING_DIM=384
+    extra_hosts:
+      # Allows the container to access Milvus running on your host machine
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

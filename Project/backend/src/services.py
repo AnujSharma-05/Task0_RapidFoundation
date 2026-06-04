@@ -126,6 +126,36 @@ async def process_document_task(doc_id: int, filename: str) -> None:
 
 async def answer_question(question: str, document_id: int | None = None, top_k: int = 5) -> dict[str, Any]:
     """Retrieve relevant chunks from Milvus and build a grounded response payload."""
+    db: Session = sessionLocal()
+    try:
+        ready_count = db.query(models.Document).filter(models.Document.status == "ready").count()
+        if ready_count == 0:
+            processing_count = db.query(models.Document).filter(models.Document.status.in_(["uploaded", "processing"])).count()
+            if processing_count > 0:
+                return {
+                    "answer": "Your documents are currently being processed. Please wait a moment and try again.",
+                    "citations": []
+                }
+            return {
+                "answer": "No documents are available in the system. Please ingest some PDFs before starting the chat.",
+                "citations": []
+            }
+        
+        if document_id is not None:
+            doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+            if not doc:
+                return {
+                    "answer": "The selected document does not exist.",
+                    "citations": []
+                }
+            if doc.status != "ready":
+                return {
+                    "answer": f"The selected document is not ready yet (current status: {doc.status}).",
+                    "citations": []
+                }
+    finally:
+        db.close()
+
     query_vector = _embed_query(question)
     hits = milvus_store.search(query_embedding=query_vector, top_k=max(1, min(top_k, 10)), document_id=document_id)
 
@@ -135,8 +165,9 @@ async def answer_question(question: str, document_id: int | None = None, top_k: 
         print(
             f"\nChunk {idx+1}"
         )
+        safe_content = hit["content"][:300].encode('ascii', errors='replace').decode('ascii')
         print(
-            hit["content"][:300]
+            safe_content
         )
 
     print(

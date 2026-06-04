@@ -5,6 +5,7 @@ from typing import List
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from fastapi.middleware.cors import CORSMiddleware
 from . import models, schemas, services
 from .database import engine, get_db
 from .models import Document
@@ -12,6 +13,14 @@ from .models import Document
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 #the server startup command is: uvicorn src.main:app --reload
 
 
@@ -171,4 +180,45 @@ async def debug_db(
 
         "chunks":
             db.query(models.DocumentChunk).count()
+    }
+
+
+@app.post("/clean-system")
+async def clean_system():
+    import gc
+    import subprocess
+    import csv
+
+    # 1. Force Garbage Collection
+    gc.collect()
+
+    # 2. Terminate zombie python processes (excluding this server process)
+    current_pid = os.getpid()
+    killed_count = 0
+    try:
+        output = subprocess.check_output(
+            'tasklist /FI "IMAGENAME eq python.exe" /FO CSV',
+            shell=True,
+            text=True
+        )
+        reader = csv.reader(output.strip().splitlines())
+        next(reader, None)
+        for row in reader:
+            if len(row) >= 2:
+                pid_str = row[1]
+                try:
+                    pid = int(pid_str)
+                    if pid != current_pid:
+                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True)
+                        killed_count += 1
+                except ValueError:
+                    continue
+    except Exception as exc:
+        print("Error cleaning processes:", exc)
+
+    return {
+        "status": "success",
+        "message": "System resources cleared",
+        "garbage_collected": True,
+        "zombies_killed": killed_count
     }

@@ -5,6 +5,7 @@ class DocumentResponse(BaseModel): #This is the response model for the document 
     filename: str
     status: str
     file_size: int
+    category: str | None = None
 
     model_config = ConfigDict(from_attributes=True) #This is used to configure the behavior of the pydantic model. It allows you to specify various options such as validation, serialization, and more. In this case, it is set to from_attributes=True, which means that the model will be populated from the attributes of the object being validated, rather than from a dictionary. This is useful when you want to create a pydantic model from an existing object, such as a SQLAlchemy model instance.
 
@@ -41,6 +42,7 @@ class DocumentStatusUpdate(BaseModel):
 class ChatRequest(BaseModel):
     question: str
     document_id: int | None = None
+    category: str | None = None
     top_k: int = 5
 
 

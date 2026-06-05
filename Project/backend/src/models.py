@@ -12,6 +12,7 @@ class Document(Base):
     file_size = Column(Integer, nullable=True)
     file_path = Column(String)
     status = Column(String, default="uploaded")
+    category = Column(String, default="general", index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 

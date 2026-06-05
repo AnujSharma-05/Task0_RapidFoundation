@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 /**
  * Fetch all uploaded documents from the server.
@@ -15,9 +15,12 @@ export async function fetchDocuments() {
  * Upload a PDF file to the backend.
  * @param {File} file 
  */
-export async function uploadDocument(file) {
+export async function uploadDocument(file, category = null) {
   const formData = new FormData();
   formData.append('file', file);
+  if (category) {
+    formData.append('category', category);
+  }
   
   const response = await fetch(`${API_BASE_URL}/upload`, {
     method: 'POST',
@@ -64,7 +67,7 @@ export async function resetSystem() {
  * @param {number|null} documentId 
  * @param {number} topK 
  */
-export async function askQuestion(question, documentId = null, topK = 5) {
+export async function askQuestion(question, documentId = null, category = null, topK = 5) {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: 'POST',
     headers: {
@@ -73,6 +76,7 @@ export async function askQuestion(question, documentId = null, topK = 5) {
     body: JSON.stringify({
       question,
       document_id: documentId ? parseInt(documentId, 10) : null,
+      category: category || null,
       top_k: parseInt(topK, 10),
     }),
   });

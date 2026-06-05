@@ -20,6 +20,8 @@ import * as api from './api';
 function App() {
   const [documents, setDocuments] = useState([]);
   const [selectedDocId, setSelectedDocId] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [uploadCategory, setUploadCategory] = useState('');
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   
@@ -99,7 +101,8 @@ function App() {
     setUploading(true);
     setErrorMsg('');
     try {
-      await api.uploadDocument(file);
+      await api.uploadDocument(file, uploadCategory);
+      setUploadCategory('');
       await loadDocuments();
     } catch (err) {
       setErrorMsg(err.message || 'File upload failed.');
@@ -169,7 +172,7 @@ function App() {
     setMessages(newMessages);
 
     try {
-      const response = await api.askQuestion(userText, selectedDocId);
+      const response = await api.askQuestion(userText, selectedDocId, selectedCategory);
       setMessages([
         ...newMessages,
         {
@@ -308,6 +311,25 @@ function App() {
           {/* File Upload Dropzone */}
           <div className="sidebar-section">
             <h2 className="sidebar-section-title">Ingest Documents</h2>
+            <div style={{ marginBottom: '10px' }} onClick={(e) => e.stopPropagation()}>
+              <input 
+                type="text" 
+                placeholder="Category Name (Optional)"
+                value={uploadCategory}
+                onChange={(e) => setUploadCategory(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
             <div 
               className="dropzone-container"
               onDragOver={handleDragOver}
@@ -336,6 +358,43 @@ function App() {
             </div>
           </div>
 
+          {/* Category Workspaces */}
+          <div className="sidebar-section" style={{ flex: 'none', display: 'flex', flexDirection: 'column' }}>
+            <h2 className="sidebar-section-title">
+              <span>Category Workspaces</span>
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '6px 0' }}>
+              {Array.from(new Set(documents.map(d => d.category).filter(Boolean))).length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'hsl(var(--text-muted))', padding: '4px 0' }}>
+                  No active categories yet.
+                </div>
+              ) : (
+                Array.from(new Set(documents.map(d => d.category).filter(Boolean))).map(cat => (
+                  <button
+                    key={cat}
+                    className={`citation-pill ${selectedCategory === cat ? 'active-filter' : ''}`}
+                    onClick={() => {
+                      setSelectedCategory(selectedCategory === cat ? null : cat);
+                      setSelectedDocId(null);
+                    }}
+                    style={{
+                      border: selectedCategory === cat ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: selectedCategory === cat ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                      color: selectedCategory === cat ? '#60a5fa' : 'hsl(var(--text-muted))',
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '12px',
+                      outline: 'none'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Document Directory list */}
           <div className="sidebar-section" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <h2 className="sidebar-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -355,18 +414,26 @@ function App() {
                   <div 
                     key={doc.id} 
                     className={`document-card ${selectedDocId === doc.id ? 'active-filter' : ''}`}
-                    onClick={() => setSelectedDocId(selectedDocId === doc.id ? null : doc.id)}
+                    onClick={() => {
+                      setSelectedDocId(selectedDocId === doc.id ? null : doc.id);
+                      setSelectedCategory(null);
+                    }}
                     style={{ cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', minWidth: 0, flex: 1 }}>
                       <FileText size={18} style={{ color: selectedDocId === doc.id ? 'hsl(var(--primary-hover))' : 'hsl(var(--text-muted))' }} />
                       <div className="document-info">
                         <span className="document-name" title={doc.filename}>{doc.filename}</span>
-                        <div className="document-meta">
+                        <div className="document-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                           <span>{formatBytes(doc.file_size)}</span>
                           <span className={`status-badge status-${doc.status}`}>
                             {doc.status}
                           </span>
+                          {doc.category && (
+                            <span className="status-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                              {doc.category}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -486,6 +553,19 @@ function App() {
                       size={12} 
                       style={{ cursor: 'pointer', marginLeft: '4px' }} 
                       onClick={() => setSelectedDocId(null)}
+                    />
+                  </div>
+                )}
+                {selectedCategory && (
+                  <div className="filter-badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                    <Database size={12} />
+                    <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Workspace: {selectedCategory}
+                    </span>
+                    <X 
+                      size={12} 
+                      style={{ cursor: 'pointer', marginLeft: '4px' }} 
+                      onClick={() => setSelectedCategory(null)}
                     />
                   </div>
                 )}

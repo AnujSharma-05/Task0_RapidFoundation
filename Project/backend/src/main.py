@@ -138,6 +138,10 @@ async def chat(payload: schemas.ChatRequest):
             top_k=payload.top_k,
         )
     except Exception as exc:
+        import traceback
+        print("\n========== CHAT ERROR ==========")
+        traceback.print_exc()
+        print("================================\n")
         raise HTTPException(status_code=503, detail=f"Chat service unavailable: {str(exc)}") from exc
 
 

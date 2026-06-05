@@ -24,9 +24,15 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
 
-EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
-    EMBEDDING_MODEL
-)
+try:
+    EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
+        EMBEDDING_MODEL,
+        local_files_only=True
+    )
+except Exception:
+    EMBEDDING_MODEL_INSTANCE = SentenceTransformer(
+        EMBEDDING_MODEL
+    )
 
 
 def _extract_text_from_pdf(file_path: str) -> str:

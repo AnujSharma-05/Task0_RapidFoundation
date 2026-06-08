@@ -1,14 +1,16 @@
 import os
 import shutil
+import asyncio
 from typing import List
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, Form
 from sqlalchemy.orm import Session
 
 from fastapi.middleware.cors import CORSMiddleware
 from . import models, schemas, services
 from .database import engine, get_db
 from .models import Document
+from .milvus_store import milvus_store
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -36,6 +38,7 @@ async def ping():
 async def upload_pdf(
     background_tasks: BackgroundTasks, #This is a special parameter that allows us to run tasks in the background without blocking the main thread. In this case, we will use it to trigger the document processing task after the file is uploaded.(always kept as the first parameter in the function definition)
     file: UploadFile = File(...), 
+    category: str | None = Form(None),
     db: Session = Depends(get_db)
     ):
     if file.content_type != "application/pdf":
@@ -58,6 +61,7 @@ async def upload_pdf(
         file_path=file_path,
         file_size=file_size,
         status="uploaded",
+        category=category or "general",
     )
 
     db.add(new_doc)
@@ -80,6 +84,7 @@ async def get_documents(db: Session = Depends(get_db)):
             "filename": doc.filename,
             "status": doc.status,
             "file_size": doc.file_size if getattr(doc, "file_size", None) is not None else (os.path.getsize(doc.file_path) if doc.file_path and os.path.exists(doc.file_path) else 0), #Explaination of this line: This line is checking if the file_size attribute exists on the doc object and is not None. If it does exist and is not None, it uses that value. If it does not exist or is None, it checks if the file_path attribute exists and if the file at that path exists. If both conditions are true, it gets the size of the file using os.path.getsize(doc.file_path). If either condition is false, it defaults to 0. This ensures that we have a valid file size value even if the file_size attribute is missing or None, or if the file itself is missing.
+            "category": doc.category,
         }
         for doc in docs
     ]
@@ -96,6 +101,7 @@ async def get_document(document_id: int, db: Session = Depends(get_db)):
         "filename": doc.filename,
         "status": doc.status,
         "file_size": doc.file_size if doc.file_size is not None else (os.path.getsize(doc.file_path) if doc.file_path and os.path.exists(doc.file_path) else 0),
+        "category": doc.category,
     }
 
 
@@ -114,6 +120,7 @@ async def update_document_status(document_id: int, payload: schemas.DocumentStat
         "filename": doc.filename,
         "status": doc.status,
         "file_size": doc.file_size if doc.file_size is not None else (os.path.getsize(doc.file_path) if doc.file_path and os.path.exists(doc.file_path) else 0),
+        "category": doc.category,
     }
 
 
@@ -123,9 +130,21 @@ async def delete_document(document_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    category_name = doc.category
     await services.delete_document_assets(document_id=doc.id, file_path=doc.file_path)
     db.delete(doc)
     db.commit()
+
+    if category_name and category_name != "general":
+        other_docs_exist = db.query(models.Document).filter(
+            models.Document.category == category_name,
+            models.Document.status == "ready"
+        ).first()
+        if not other_docs_exist:
+            milvus_store.delete_category_summary(category_name)
+        else:
+            asyncio.create_task(services.update_categorical_summary(category_name))
+
     return {"message": "Document deleted", "id": document_id}
 
 
@@ -135,6 +154,7 @@ async def chat(payload: schemas.ChatRequest):
         return await services.answer_question(
             question=payload.question,
             document_id=payload.document_id,
+            category=payload.category,
             top_k=payload.top_k,
         )
     except Exception as exc:

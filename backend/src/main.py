@@ -10,19 +10,10 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Uplo
 from sqlalchemy.orm import Session
 
 from fastapi.middleware.cors import CORSMiddleware
-from . import models, schemas, services, config, auth
+from . import models, schemas, services, config
 from .database import engine, get_db
 from .models import Document
 from .milvus_store import milvus_store
-
-
-from datetime import datetime, timedelta
-from passlib.context import CryptContext
-from jose import jwt
-from fastapi.security import OAuth2PasswordRequestForm
-
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -36,8 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Register Routers ---
-app.include_router(auth.router)  # <--- THIS connects all your auth routes!
 
 #the server startup command is: uvicorn src.main:app --reload
 
@@ -69,8 +58,7 @@ async def upload_pdf(
     background_tasks: BackgroundTasks, #This is a special parameter that allows us to run tasks in the background without blocking the main thread. In this case, we will use it to trigger the document processing task after the file is uploaded.(always kept as the first parameter in the function definition)
     file: UploadFile = File(...), 
     category: str | None = Form(None),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    db: Session = Depends(get_db)
     ):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF files are allowed.")
@@ -93,7 +81,6 @@ async def upload_pdf(
         file_size=file_size,
         status="uploaded",
         category=category or "general",
-        owner_id=current_user.id,
     )
 
     db.add(new_doc)
@@ -108,10 +95,9 @@ async def upload_pdf(
 
 @app.get("/documents", response_model=List[schemas.DocumentResponse])
 async def get_documents(
-    db: Session = Depends(get_db),
-    current_user = Depends(auth.get_current_user)
+    db: Session = Depends(get_db)
 ):
-    docs = db.query(models.Document).filter(models.Document.owner_id == current_user.id).all()
+    docs = db.query(models.Document).all()
 
     return [
         {
@@ -126,10 +112,9 @@ async def get_documents(
 
 
 @app.get("/documents/{document_id}", response_model=schemas.DocumentResponse)
-async def get_document(document_id: int, db: Session = Depends(get_db), current_user = Depends(auth.get_current_user)):
+async def get_document(document_id: int, db: Session = Depends(get_db)):
     doc = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.owner_id == current_user.id,  
+        models.Document.id == document_id
         ).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -242,9 +227,6 @@ async def debug_db(
 
         "chunks":
             db.query(models.DocumentChunk).count(),
-        
-        "users": 
-            db.query(models.User).count(),
     }
 
 

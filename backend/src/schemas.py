@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict #ConfigDict is used to configure the behavior of the pydantic model. It allows you to specify various options such as validation, serialization, and more.
 
+from pydantic import EmailStr
+
 class DocumentResponse(BaseModel): #This is the response model for the document upload endpoint. It defines the structure of the response that will be returned when a document is uploaded.
     id: int
     filename: str
@@ -58,3 +60,10 @@ class ChatResponse(BaseModel):
     citations: list[ChatCitation]
 
     
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

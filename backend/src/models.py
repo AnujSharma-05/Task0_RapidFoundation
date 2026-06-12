@@ -14,6 +14,8 @@ class Document(Base):
     status = Column(String, default="uploaded")
     category = Column(String, default="general", index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False,index=True)
+    owner = relationship("User", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
 
 
@@ -28,5 +30,17 @@ class DocumentChunk(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", back_populates="chunks")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    created_at= Column(DateTime, default=datetime.utcnow)
+    documents = relationship("Document", back_populates="owner", cascade="all, delete-orphan")
+
+
 
 

@@ -2,12 +2,15 @@ import os
 import shutil
 import asyncio
 from typing import List
+from . import config
+
+
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, Form
 from sqlalchemy.orm import Session
 
 from fastapi.middleware.cors import CORSMiddleware
-from . import models, schemas, services
+from . import models, schemas, services, config
 from .database import engine, get_db
 from .models import Document
 from .milvus_store import milvus_store
@@ -23,7 +26,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 #the server startup command is: uvicorn src.main:app --reload
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.get("/ping")
@@ -75,7 +94,9 @@ async def upload_pdf(
 #----get all documents----
 
 @app.get("/documents", response_model=List[schemas.DocumentResponse])
-async def get_documents(db: Session = Depends(get_db)):
+async def get_documents(
+    db: Session = Depends(get_db)
+):
     docs = db.query(models.Document).all()
 
     return [
@@ -92,7 +113,9 @@ async def get_documents(db: Session = Depends(get_db)):
 
 @app.get("/documents/{document_id}", response_model=schemas.DocumentResponse)
 async def get_document(document_id: int, db: Session = Depends(get_db)):
-    doc = db.query(models.Document).filter(models.Document.id == document_id).first()
+    doc = db.query(models.Document).filter(
+        models.Document.id == document_id
+        ).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -203,7 +226,7 @@ async def debug_db(
             db.query(models.Document).count(),
 
         "chunks":
-            db.query(models.DocumentChunk).count()
+            db.query(models.DocumentChunk).count(),
     }
 
 
@@ -246,3 +269,5 @@ async def clean_system():
         "garbage_collected": True,
         "zombies_killed": killed_count
     }
+
+

@@ -1,8 +1,6 @@
 import asyncio
 import os
 from typing import Any
-from matplotlib.style import context
-from networkx import hits
 from .config import EMBEDDING_MODEL
 
 from sqlalchemy.orm import Session
@@ -35,7 +33,6 @@ def _extract_text_from_pdf(file_path: str) -> str:
     pages = [page.extract_text() or "" for page in reader.pages]
     return "\n".join(pages).strip()
 
-#currently the chunking is not optimised as it just strip on the basis of character count, we can further improve it by using a more intelligent approach that takes into account sentence boundaries, semantic coherence, or even using a sliding window technique to create overlapping chunks.
 def _chunk_text(
     text: str,
 ) -> list[str]:
